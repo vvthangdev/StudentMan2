@@ -1,10 +1,7 @@
 package vn.edu.hust.studentman
 
-import android.os.Parcelable
-import kotlinx.parcelize.Parcelize
-
-@Parcelize
-data class StudentModel(
-    val studentName: String,
-    val studentId: String
-) : Parcelable
+data class StudentModel(val studentName: String, val studentId: String) {
+    override fun toString(): String {
+        return "$studentName - $studentId"
+    }
+}

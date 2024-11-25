@@ -8,108 +8,132 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.Button
 import android.widget.ListView
-import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
-  private lateinit var studentListView: ListView
-  private lateinit var studentAdapter: ArrayAdapter<String>
-  private val students = mutableListOf(
-    "Nguyễn Văn An - SV001",
-    "Trần Thị Bảo - SV002"
-  )
-  private var selectedPosition: Int = -1
+    private lateinit var studentListView: ListView
+    private lateinit var studentAdapter: ArrayAdapter<String>
+    private lateinit var addButton: Button
+    private val students = mutableListOf(
+        StudentModel("Nguyễn Văn An", "SV001"),
+        StudentModel("Trần Thị Bảo", "SV002")
+    )
 
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    setContentView(R.layout.activity_main)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
 
-    studentListView = findViewById(R.id.list_view_students)
+        studentListView = findViewById(R.id.list_view_students)
+        addButton = findViewById(R.id.btn_add_student)
+        studentAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, students.map { it.toString() })
+        studentListView.adapter = studentAdapter
 
-    // Adapter cho ListView
-    studentAdapter = ArrayAdapter(this, android.R.layout.simple_list_item_1, students)
-    studentListView.adapter = studentAdapter
+        // Đăng ký context menu cho ListView
+        registerForContextMenu(studentListView)
 
-    // Đăng ký ContextMenu cho ListView
-    registerForContextMenu(studentListView)
-
-    // Xử lý sự kiện click item
-    studentListView.onItemClickListener =
-      AdapterView.OnItemClickListener { _, _, position, _ ->
-        Toast.makeText(this, "Selected: ${students[position]}", Toast.LENGTH_SHORT).show()
-      }
-  }
-
-  // Tạo Menu (OptionMenu)
-  override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-    menuInflater.inflate(R.menu.option_menu, menu)
-    return true
-  }
-
-  // Xử lý click Menu (OptionMenu)
-  override fun onOptionsItemSelected(item: MenuItem): Boolean {
-    when (item.itemId) {
-      R.id.menu_add_new -> {
-        // Mở AddActivity để thêm sinh viên mới
-        val intent = Intent(this, AddStudentActivity::class.java)
-        startActivityForResult(intent, 1)
-      }
-    }
-    return super.onOptionsItemSelected(item)
-  }
-
-  // Tạo ContextMenu cho ListView
-  override fun onCreateContextMenu(
-    menu: ContextMenu?,
-    v: View?,
-    menuInfo: ContextMenu.ContextMenuInfo?
-  ) {
-    super.onCreateContextMenu(menu, v, menuInfo)
-    menuInflater.inflate(R.menu.context_menu, menu)
-
-    val info = menuInfo as AdapterView.AdapterContextMenuInfo
-    selectedPosition = info.position
-  }
-
-  // Xử lý click ContextMenu
-  override fun onContextItemSelected(item: MenuItem): Boolean {
-    when (item.itemId) {
-      R.id.menu_edit -> {
-        // Mở EditActivity để chỉnh sửa thông tin
-        val intent = Intent(this, EditStudentActivity::class.java).apply {
-          putExtra("studentData", students[selectedPosition])
-          putExtra("position", selectedPosition)
+        studentListView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
+            editStudent(position)
         }
-        startActivityForResult(intent, 2)
-      }
-      R.id.menu_remove -> {
-        // Xóa sinh viên khỏi danh sách
-        students.removeAt(selectedPosition)
-        studentAdapter.notifyDataSetChanged()
-        Toast.makeText(this, "Student removed!", Toast.LENGTH_SHORT).show()
-      }
-    }
-    return super.onContextItemSelected(item)
-  }
 
-  // Nhận kết quả từ các Activity
-  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-    super.onActivityResult(requestCode, resultCode, data)
-    if (resultCode == RESULT_OK && data != null) {
-      val studentName = data.getStringExtra("studentName")
-      val studentId = data.getStringExtra("studentId")
-      val position = data.getIntExtra("position", -1)
-
-      if (requestCode == 1 && studentName != null && studentId != null) {
-        // Thêm sinh viên mới
-        students.add("$studentName - $studentId")
-        studentAdapter.notifyDataSetChanged()
-      } else if (requestCode == 2 && studentName != null && studentId != null) {
-        // Cập nhật sinh viên
-        students[position] = "$studentName - $studentId"
-        studentAdapter.notifyDataSetChanged()
-      }
+        addButton.setOnClickListener {
+            val intent = Intent(this, AddStudentActivity::class.java)
+            startActivityForResult(intent, REQUEST_ADD_STUDENT)
+        }
     }
-  }
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.main_menu, menu)
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.menu_add_new -> {
+                val intent = Intent(this, AddStudentActivity::class.java)
+                startActivityForResult(intent, REQUEST_ADD_STUDENT)
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    override fun onCreateContextMenu(menu: ContextMenu?, v: View?, menuInfo: ContextMenu.ContextMenuInfo?) {
+        super.onCreateContextMenu(menu, v, menuInfo)
+        menuInflater.inflate(R.menu.context_menu, menu)
+    }
+
+    override fun onContextItemSelected(item: MenuItem): Boolean {
+        val info = item.menuInfo as AdapterView.AdapterContextMenuInfo
+        return when (item.itemId) {
+            R.id.menu_edit -> {
+                editStudent(info.position)
+                true
+            }
+            R.id.menu_remove -> {
+                removeStudent(info.position)
+                true
+            }
+            else -> super.onContextItemSelected(item)
+        }
+    }
+
+    private fun editStudent(position: Int) {
+        val intent = Intent(this, EditStudentActivity::class.java).apply {
+            putExtra(EXTRA_STUDENT_NAME, students[position].studentName)
+            putExtra(EXTRA_STUDENT_ID, students[position].studentId)
+            putExtra(EXTRA_STUDENT_POSITION, position)
+        }
+        startActivityForResult(intent, REQUEST_EDIT_STUDENT)
+    }
+
+    private fun removeStudent(position: Int) {
+        AlertDialog.Builder(this)
+            .setTitle("Delete Student")
+            .setMessage("Are you sure you want to delete this student?")
+            .setPositiveButton("Yes") { _, _ ->
+                students.removeAt(position)
+                studentAdapter.clear()
+                studentAdapter.addAll(students.map { it.toString() })
+                studentAdapter.notifyDataSetChanged()
+            }
+            .setNegativeButton("No", null)
+            .create()
+            .show()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (resultCode == RESULT_OK && data != null) {
+            val studentName = data.getStringExtra(EXTRA_STUDENT_NAME) ?: return
+            val studentId = data.getStringExtra(EXTRA_STUDENT_ID) ?: return
+            when (requestCode) {
+                REQUEST_ADD_STUDENT -> {
+                    students.add(StudentModel(studentName, studentId))
+                    studentAdapter.clear()
+                    studentAdapter.addAll(students.map { it.toString() })
+                    studentAdapter.notifyDataSetChanged()
+                }
+                REQUEST_EDIT_STUDENT -> {
+                    val position = data.getIntExtra(EXTRA_STUDENT_POSITION, -1)
+                    if (position != -1) {
+                        students[position] = StudentModel(studentName, studentId)
+                        studentAdapter.clear()
+                        studentAdapter.addAll(students.map { it.toString() })
+                        studentAdapter.notifyDataSetChanged()
+                    }
+                }
+            }
+        }
+    }
+
+    companion object {
+        const val REQUEST_ADD_STUDENT = 1
+        const val REQUEST_EDIT_STUDENT = 2
+        const val EXTRA_STUDENT_NAME = "EXTRA_STUDENT_NAME"
+        const val EXTRA_STUDENT_ID = "EXTRA_STUDENT_ID"
+        const val EXTRA_STUDENT_POSITION = "EXTRA_STUDENT_POSITION"
+    }
 }
